@@ -2,20 +2,21 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Linking,
-    Modal,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Image,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import ConversationThread, { Message } from './components/ConversationThread';
 import { supabase } from './lib/supabase';
@@ -800,7 +801,11 @@ export default function App() {
         {/* Top Navbar */}
         <View style={styles.navbar}>
           <View style={styles.logoContainer}>
-            <Text style={styles.navbarTitle}>DocLexa</Text>
+            <Image
+              source={require('../../assets/images/logo.png')}
+              style={{ width: 100, height: 40 }}
+              resizeMode="contain"
+            />
           </View>
           <View style={styles.navbarRight}>
             <TouchableOpacity
