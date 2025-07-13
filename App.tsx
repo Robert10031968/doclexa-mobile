@@ -802,10 +802,13 @@ export default function App() {
         <View style={styles.navbar}>
           <View style={styles.logoContainer}>
             <Image
-              source={require('../../assets/images/logo.png')}
+              source={require('./assets/images/logo.png')}
               style={{ width: 100, height: 40 }}
               resizeMode="contain"
+              onError={(error) => console.log('Logo loading error:', error)}
             />
+            {/* Fallback text in case image doesn't load */}
+            <Text style={[styles.navbarTitle, { position: 'absolute', opacity: 0 }]}>DocLexa</Text>
           </View>
           <View style={styles.navbarRight}>
             <TouchableOpacity
