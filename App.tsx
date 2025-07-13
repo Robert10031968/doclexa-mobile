@@ -4,11 +4,8 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Linking,
-  Modal,
   Platform,
-  Pressable,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -19,6 +16,7 @@ import {
   View
 } from 'react-native';
 import ConversationThread, { Message } from './components/ConversationThread';
+import Navbar from './components/Navbar';
 import { supabase } from './lib/supabase';
 
 interface Document {
@@ -798,70 +796,15 @@ export default function App() {
     <SafeAreaView style={{ flex: 1 }}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       <View style={styles.container}>
-        {/* Top Navbar */}
-        <View style={styles.navbar}>
-          <View style={styles.logoContainer}>
-            <Image
-              source={require('./assets/images/logo.png')}
-              style={{ width: 100, height: 40 }}
-              resizeMode="contain"
-              onError={(error) => console.log('Logo loading error:', error)}
-            />
-            {/* Fallback text in case image doesn't load */}
-            <Text style={[styles.navbarTitle, { position: 'absolute', opacity: 0 }]}>DocLexa</Text>
-          </View>
-          <View style={styles.navbarRight}>
-            <TouchableOpacity
-              style={styles.languageDropdownTrigger}
-              onPress={() => setShowLanguageModal(true)}
-            >
-              <Text style={styles.languageDropdownIcon}>🌐</Text>
-              <Text style={styles.languageDropdownText}>
-                {t('language')}: {languageCodes.find(l => l.code === selectedLanguage)?.label || 'English'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.logoutButton}
-              onPress={handleLogout}
-            >
-              <Text style={styles.logoutButtonText}>{t('logout')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      {/* Language Dropdown Modal */}
-      <Modal
-        visible={showLanguageModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowLanguageModal(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setShowLanguageModal(false)}>
-          <View style={styles.languageModalContent}>
-            {languageCodes.map((lang) => (
-              <TouchableOpacity
-                key={lang.code}
-                style={[
-                  styles.languageOption,
-                  selectedLanguage === lang.code && styles.languageOptionSelected
-                ]}
-                onPress={() => {
-                  setSelectedLanguage(lang.code);
-                  setShowLanguageModal(false);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.languageOptionText,
-                    selectedLanguage === lang.code && styles.languageOptionTextSelected
-                  ]}
-                >
-                  {lang.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </Pressable>
-      </Modal>
+                 <Navbar
+           selectedLanguage={selectedLanguage}
+           languageCodes={languageCodes}
+           showLanguageModal={showLanguageModal}
+           setShowLanguageModal={setShowLanguageModal}
+           setSelectedLanguage={setSelectedLanguage}
+           handleLogout={handleLogout}
+           t={t}
+                  />
 
       <ScrollView style={styles.content}>
         {/* Plan Information */}
@@ -990,9 +933,6 @@ export default function App() {
             <Text style={styles.footerLinkText}>{t('terms')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.footerLink}>
-            <Text style={styles.footerLinkText}>{t('cancel')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.footerLink}>
             <Text style={styles.footerLinkText}>{t('legal')}</Text>
           </TouchableOpacity>
         </View>
@@ -1063,7 +1003,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 0,
     paddingVertical: 15,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -1082,8 +1022,9 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flex: 1,
+    paddingLeft: 6,
   },
   logoImage: {
     width: 90,
@@ -1306,6 +1247,7 @@ const styles = StyleSheet.create({
   footer: {
     backgroundColor: '#fff',
     padding: 15,
+    paddingBottom: 24, // Added extra bottom padding for system gesture bar
     borderTopWidth: 1,
     borderTopColor: '#ddd',
   },
