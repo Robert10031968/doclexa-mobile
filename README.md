@@ -2,6 +2,21 @@
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
+## Environment Variables Setup
+
+This app uses Supabase for backend services. To configure the Supabase connection:
+
+1. Create a `.env` file in the root directory with your Supabase credentials:
+
+   ```bash
+   SUPABASE_URL=your_supabase_project_url
+   SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
+
+2. The `.env` file is already added to `.gitignore` to prevent committing secrets to version control.
+
+3. The app will automatically load these environment variables through `app.config.js` and make them available via `expo-constants`.
+
 ## Get started
 
 1. Install dependencies

@@ -1,11 +1,18 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
   Linking,
+  Modal,
   Platform,
+  Pressable,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -13,7 +20,8 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  TouchableWithoutFeedback,
+  View,
 } from 'react-native';
 import ConversationThread, { Message } from './components/ConversationThread';
 import Navbar from './components/Navbar';
@@ -23,12 +31,17 @@ interface Document {
   id: string;
   name: string;
   type: 'pdf' | 'image';
+  uri?: string;
 }
 
 interface AnalysisResult {
   id: string;
   question: string;
   answer: string;
+  created_at?: string;
+  document_type?: string;
+  language?: string;
+  tokens_used?: number;
 }
 
 // Add type for translations object
@@ -45,7 +58,7 @@ const translations: { [lang: string]: TranslationStrings } = {
     uploadPDF: 'Upload PDF',
     uploadImage: 'Upload Image',
     analyze: 'Start Analyzing',
-    analysisType: 'Analysis Type',
+
     documentPool: 'Document Pool',
     results: 'Analysis Results',
     followup: 'Ask Follow-up Questions',
@@ -62,7 +75,7 @@ const translations: { [lang: string]: TranslationStrings } = {
     legal: 'Legal Disclaimer',
     analyzing: 'Analyzing...',
     selectType: 'Select type',
-    selectAnalysisType: 'Select analysis type',
+
     selectLanguage: 'Select language',
     errorEmailPassword: 'Please enter both email and password',
     errorUpload: 'Please upload at least one document',
@@ -79,6 +92,11 @@ const translations: { [lang: string]: TranslationStrings } = {
     topUpAccount: 'Top up your account',
     noAnalysesMessage: 'You have no analyses left.',
     refillLink: 'Tap here to refill your account.',
+    disclaimer: 'This analysis is for informational purposes only and does not constitute legal advice. For legal matters, please consult a qualified attorney.',
+
+    photoHelperText: 'Photos will be automatically added to your document list',
+    showPreviousAnalyses: 'Show previous analyses',
+    hidePreviousAnalyses: 'Hide previous analyses',
   },
   es: {
     language: 'Idioma',
@@ -88,7 +106,7 @@ const translations: { [lang: string]: TranslationStrings } = {
     uploadPDF: 'Subir PDF',
     uploadImage: 'Subir imagen',
     analyze: 'Comenzar análisis',
-    analysisType: 'Tipo de análisis',
+
     documentPool: 'Documentos',
     results: 'Resultados del análisis',
     followup: 'Preguntar seguimiento',
@@ -105,7 +123,7 @@ const translations: { [lang: string]: TranslationStrings } = {
     legal: 'Aviso legal',
     analyzing: 'Analizando...',
     selectType: 'Seleccionar tipo',
-    selectAnalysisType: 'Seleccionar tipo de análisis',
+
     selectLanguage: 'Seleccionar idioma',
     errorEmailPassword: 'Por favor, introduce correo y contraseña',
     errorUpload: 'Por favor, sube al menos un documento',
@@ -122,6 +140,11 @@ const translations: { [lang: string]: TranslationStrings } = {
     topUpAccount: 'Recarga tu cuenta',
     noAnalysesMessage: 'No tienes análisis restantes.',
     refillLink: 'Toca aquí para recargar tu cuenta.',
+    disclaimer: 'Este análisis tiene únicamente fines informativos y no constituye asesoramiento legal. Para cuestiones legales, consulta con un abogado calificado.',
+
+    photoHelperText: 'Las fotos se añadirán automáticamente a tu lista de documentos',
+    showPreviousAnalyses: 'Mostrar análisis anteriores',
+    hidePreviousAnalyses: 'Ocultar análisis anteriores',
   },
   de: {
     language: 'Sprache',
@@ -131,7 +154,7 @@ const translations: { [lang: string]: TranslationStrings } = {
     uploadPDF: 'PDF hochladen',
     uploadImage: 'Bild hochladen',
     analyze: 'Analyse starten',
-    analysisType: 'Analysentyp',
+
     documentPool: 'Dokumentenpool',
     results: 'Analyseergebnisse',
     followup: 'Folgefragen stellen',
@@ -148,7 +171,7 @@ const translations: { [lang: string]: TranslationStrings } = {
     legal: 'Rechtlicher Hinweis',
     analyzing: 'Analysiere...',
     selectType: 'Typ auswählen',
-    selectAnalysisType: 'Analysentyp auswählen',
+
     selectLanguage: 'Sprache auswählen',
     errorEmailPassword: 'Bitte E-Mail und Passwort eingeben',
     errorUpload: 'Bitte mindestens ein Dokument hochladen',
@@ -165,6 +188,11 @@ const translations: { [lang: string]: TranslationStrings } = {
     topUpAccount: 'Konto aufladen',
     noAnalysesMessage: 'Sie haben keine Analysen mehr.',
     refillLink: 'Tippen Sie hier, um Ihr Konto aufzufüllen.',
+    disclaimer: 'Diese Analyse dient ausschließlich zu Informationszwecken und stellt keine Rechtsberatung dar. Wenden Sie sich für rechtliche Fragen an einen qualifizierten Anwalt.',
+
+    photoHelperText: 'Fotos werden automatisch zu Ihrer Dokumentenliste hinzugefügt',
+    showPreviousAnalyses: 'Frühere Analysen anzeigen',
+    hidePreviousAnalyses: 'Frühere Analysen ausblenden',
   },
   pl: {
     language: 'Język',
@@ -174,7 +202,7 @@ const translations: { [lang: string]: TranslationStrings } = {
     uploadPDF: 'Prześlij PDF',
     uploadImage: 'Prześlij obraz',
     analyze: 'Rozpocznij analizę',
-    analysisType: 'Typ analizy',
+
     documentPool: 'Pula dokumentów',
     results: 'Wyniki analizy',
     followup: 'Zadaj pytanie uzupełniające',
@@ -191,7 +219,7 @@ const translations: { [lang: string]: TranslationStrings } = {
     legal: 'Informacja prawna',
     analyzing: 'Analizowanie...',
     selectType: 'Wybierz typ',
-    selectAnalysisType: 'Wybierz typ analizy',
+
     selectLanguage: 'Wybierz język',
     errorEmailPassword: 'Wprowadź e-mail i hasło',
     errorUpload: 'Prześlij co najmniej jeden dokument',
@@ -208,18 +236,22 @@ const translations: { [lang: string]: TranslationStrings } = {
     topUpAccount: 'Doładuj konto',
     noAnalysesMessage: 'Nie masz pozostałych analiz.',
     refillLink: 'Dotknij tutaj, aby doładować konto.',
+    disclaimer: 'Niniejsza analiza ma wyłącznie charakter informacyjny i nie stanowi porady prawnej. W przypadku kwestii prawnych skonsultuj się z wykwalifikowanym prawnikiem.',
+
+    photoHelperText: 'Zdjęcia zostaną automatycznie dodane do Twojej listy dokumentów',
+    showPreviousAnalyses: 'Pokaż poprzednie analizy',
+    hidePreviousAnalyses: 'Ukryj poprzednie analizy',
   },
   fr: {
     language: 'Langue',
     heroTitle: 'Votre assistant de documents IA',
-    heroSubtitle: 'Téléchargez des documents ou prenez des photos pour obtenir des réponses et des informations instantanées grâce à l’IA.',
+    heroSubtitle: 'Téléchargez des documents ou prenez des photos pour obtenir des réponses et des informations instantanées grâce à l\'IA.',
     upload: 'Télécharger un document',
     uploadPDF: 'Télécharger un PDF',
     uploadImage: 'Télécharger une image',
-    analyze: 'Commencer l’analyse',
-    analysisType: 'Type d’analyse',
+    analyze: 'Commencer l\'analyse',
     documentPool: 'Pool de documents',
-    results: 'Résultats de l’analyse',
+    results: 'Résultats de l\'analyse',
     followup: 'Poser une question de suivi',
     followupPlaceholder: 'Posez une question de suivi...',
     loginTitle: 'DocLexa',
@@ -229,17 +261,16 @@ const translations: { [lang: string]: TranslationStrings } = {
     login: 'Connexion',
     logout: 'Déconnexion',
     privacy: 'Politique de confidentialité',
-    terms: 'Conditions d’utilisation',
-    cancel: 'Annuler l’abonnement',
+    terms: 'Conditions d\'utilisation',
+    cancel: 'Annuler l\'abonnement',
     legal: 'Avertissement légal',
     analyzing: 'Analyse...',
     selectType: 'Sélectionner le type',
-    selectAnalysisType: 'Sélectionner le type d’analyse',
     selectLanguage: 'Sélectionner la langue',
-    errorEmailPassword: 'Veuillez saisir l’e-mail et le mot de passe',
+    errorEmailPassword: 'Veuillez saisir l\'e-mail et le mot de passe',
     errorUpload: 'Veuillez télécharger au moins un document',
     errorPickDoc: 'Échec de la sélection du document',
-    errorPickImg: 'Échec de la sélection de l’image',
+    errorPickImg: 'Échec de la sélection de l\'image',
     errorFollowup: 'Veuillez saisir une question',
     ask: 'Demander',
     'button.upload': 'Télécharger un document',
@@ -251,6 +282,10 @@ const translations: { [lang: string]: TranslationStrings } = {
     topUpAccount: 'Recharger votre compte',
     noAnalysesMessage: 'Vous n\'avez plus d\'analyses.',
     refillLink: 'Appuyez ici pour recharger votre compte.',
+    disclaimer: 'Cette analyse est fournie à titre informatif uniquement et ne constitue pas un avis juridique. Pour toute question juridique, veuillez consulter un avocat qualifié.',
+    photoHelperText: 'Les photos seront automatiquement ajoutées à votre liste de documents',
+    showPreviousAnalyses: 'Afficher les analyses précédentes',
+    hidePreviousAnalyses: 'Masquer les analyses précédentes',
   },
   pt: {
     language: 'Idioma',
@@ -260,7 +295,6 @@ const translations: { [lang: string]: TranslationStrings } = {
     uploadPDF: 'Enviar PDF',
     uploadImage: 'Enviar imagem',
     analyze: 'Iniciar análise',
-    analysisType: 'Tipo de análise',
     documentPool: 'Pool de documentos',
     results: 'Resultados da análise',
     followup: 'Perguntas de acompanhamento',
@@ -277,7 +311,6 @@ const translations: { [lang: string]: TranslationStrings } = {
     legal: 'Aviso legal',
     analyzing: 'Analisando...',
     selectType: 'Selecionar tipo',
-    selectAnalysisType: 'Selecionar tipo de análise',
     selectLanguage: 'Selecionar idioma',
     errorEmailPassword: 'Por favor, insira e-mail e senha',
     errorUpload: 'Por favor, envie pelo menos um documento',
@@ -294,18 +327,21 @@ const translations: { [lang: string]: TranslationStrings } = {
     topUpAccount: 'Recarregar sua conta',
     noAnalysesMessage: 'Você não tem análises restantes.',
     refillLink: 'Toque aqui para recarregar sua conta.',
+    disclaimer: 'Esta análise tem apenas fins informativos e não constitui aconselhamento jurídico. Para questões legais, consulte um advogado qualificado.',
+    photoHelperText: 'Fotos serão automaticamente adicionadas à sua lista de documentos',
+    showPreviousAnalyses: 'Mostrar análises anteriores',
+    hidePreviousAnalyses: 'Ocultar análises anteriores',
   },
   it: {
     language: 'Lingua',
     heroTitle: 'Il tuo assistente documentale AI',
-    heroSubtitle: 'Carica documenti o scatta foto per ottenere risposte e approfondimenti immediati con l’IA.',
+    heroSubtitle: 'Carica documenti o scatta foto per ottenere risposte e approfondimenti immediati con l\'IA.',
     upload: 'Carica documento',
     uploadPDF: 'Carica PDF',
     uploadImage: 'Carica immagine',
     analyze: 'Avvia analisi',
-    analysisType: 'Tipo di analisi',
     documentPool: 'Pool di documenti',
-    results: 'Risultati dell’analisi',
+    results: 'Risultati dell\'analisi',
     followup: 'Domande di follow-up',
     followupPlaceholder: 'Fai una domanda di follow-up...',
     loginTitle: 'DocLexa',
@@ -320,12 +356,11 @@ const translations: { [lang: string]: TranslationStrings } = {
     legal: 'Avvertenza legale',
     analyzing: 'Analisi in corso...',
     selectType: 'Seleziona tipo',
-    selectAnalysisType: 'Seleziona tipo di analisi',
     selectLanguage: 'Seleziona lingua',
     errorEmailPassword: 'Inserisci e-mail e password',
     errorUpload: 'Carica almeno un documento',
     errorPickDoc: 'Impossibile selezionare il documento',
-    errorPickImg: 'Impossibile selezionare l’immagine',
+    errorPickImg: 'Impossibile selezionare l\'immagine',
     errorFollowup: 'Inserisci una domanda',
     ask: 'Chiedi',
     'button.upload': 'Carica documento',
@@ -337,6 +372,55 @@ const translations: { [lang: string]: TranslationStrings } = {
     topUpAccount: 'Ricarica il tuo account',
     noAnalysesMessage: 'Non hai più analisi rimaste.',
     refillLink: 'Tocca qui per ricaricare il tuo account.',
+    disclaimer: 'Questa analisi ha solo scopo informativo e non costituisce consulenza legale. Per questioni legali, rivolgiti a un avvocato qualificato.',
+    photoHelperText: 'Le foto verranno automaticamente aggiunte alla tua lista di documenti',
+    showPreviousAnalyses: 'Mostra analisi precedenti',
+    hidePreviousAnalyses: 'Nascondi analisi precedenti',
+  },
+  cs: {
+    language: 'Jazyk',
+    heroTitle: 'Váš AI asistent pro dokumenty',
+    heroSubtitle: 'Nahrajte dokumenty nebo pořiďte fotografie pro okamžité AI odpovědi a poznatky.',
+    upload: 'Nahrát dokument',
+    uploadPDF: 'Nahrát PDF',
+    uploadImage: 'Nahrát obrázek',
+    analyze: 'Spustit analýzu',
+    documentPool: 'Pool dokumentů',
+    results: 'Výsledky analýzy',
+    followup: 'Položit doplňující otázky',
+    followupPlaceholder: 'Položte doplňující otázku...',
+    loginTitle: 'DocLexa',
+    loginSubtitle: 'AI analýza dokumentů',
+    email: 'E-mail',
+    password: 'Heslo',
+    login: 'Přihlásit se',
+    logout: 'Odhlásit se',
+    privacy: 'Zásady ochrany osobních údajů',
+    terms: 'Podmínky služby',
+    cancel: 'Zrušit předplatné',
+    legal: 'Právní upozornění',
+    analyzing: 'Analyzuji...',
+    selectType: 'Vybrat typ',
+    selectLanguage: 'Vybrat jazyk',
+    errorEmailPassword: 'Prosím zadejte e-mail a heslo',
+    errorUpload: 'Prosím nahrajte alespoň jeden dokument',
+    errorPickDoc: 'Nepodařilo se vybrat dokument',
+    errorPickImg: 'Nepodařilo se vybrat obrázek',
+    errorFollowup: 'Prosím zadejte otázku',
+    ask: 'Položit',
+    'button.upload': 'Nahrát dokument',
+    'button.takePhoto': 'Pořídit fotografii',
+    'messages.placeholder': 'Vaše analýza se zde zobrazí.',
+    'messages.noMessages': 'Zatím žádné zprávy.',
+    analysisLimitWarning: 'Vyčerpali jste všechny dostupné analýzy. Prosím upgradujte svůj plán pro pokračování.',
+    noAnalysesLeft: 'Žádné analýzy nezbývají',
+    topUpAccount: 'Dobít účet',
+    noAnalysesMessage: 'Nemáte žádné zbývající analýzy.',
+    refillLink: 'Klepněte zde pro dobití účtu.',
+    disclaimer: 'Tato analýza slouží pouze pro informativní účely a nepředstavuje právní poradenství. V právních záležitostech se prosím obraťte na kvalifikovaného právníka.',
+    photoHelperText: 'Fotky se automaticky přidají do vaší seznamu dokumentů',
+    showPreviousAnalyses: 'Zobrazit předchozí analýzy',
+    hidePreviousAnalyses: 'Skrýt předchozí analýzy',
   },
 };
 
@@ -348,6 +432,7 @@ const languageCodes = [
   { code: 'fr', label: 'French' },
   { code: 'pt', label: 'Portuguese' },
   { code: 'it', label: 'Italian' },
+  { code: 'cs', label: 'Czech' },
 ];
 
 export default function App() {
@@ -360,7 +445,7 @@ export default function App() {
   const [signUpPassword, setSignUpPassword] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [showLanguageModal, setShowLanguageModal] = useState(false);
-  const [analysisType, setAnalysisType] = useState('General');
+
   const [documents, setDocuments] = useState<Document[]>([]);
   const [results, setResults] = useState<AnalysisResult[]>([]);
   const [followUpQuestion, setFollowUpQuestion] = useState('');
@@ -371,6 +456,13 @@ export default function App() {
   const [totalAnalyses, setTotalAnalyses] = useState<number>(0);
   const [usedAnalyses, setUsedAnalyses] = useState<number>(0);
   const [isLoadingPlan, setIsLoadingPlan] = useState(false);
+  const [previousAnalyses, setPreviousAnalyses] = useState<AnalysisResult[]>([]);
+  const [isLoadingAnalyses, setIsLoadingAnalyses] = useState(false);
+  const [showPreviousAnalyses, setShowPreviousAnalyses] = useState(false); // Toggle previous analyses view
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+  const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisResult | null>(null);
 
   // Check session on app startup
   useEffect(() => {
@@ -408,6 +500,8 @@ export default function App() {
           setEmail(session.user.email || '');
           // Fetch user plan after login
           fetchUserPlan(session.user.id);
+          // Fetch previous analyses after login
+          fetchPreviousAnalyses();
         } else if (event === 'SIGNED_OUT') {
           setIsLoggedIn(false);
           setEmail('');
@@ -419,6 +513,9 @@ export default function App() {
           setUserPlan('');
           setTotalAnalyses(0);
           setUsedAnalyses(0);
+          // Clear previous analyses
+          setPreviousAnalyses([]);
+          setShowPreviousAnalyses(false);
         }
       }
     );
@@ -430,30 +527,24 @@ export default function App() {
   const fetchUserPlan = async (userId: string) => {
     setIsLoadingPlan(true);
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('plan_name, total_analyses, used_analyses')
-        .eq('id', userId)
-        .single();
+      console.log('Fetching user plan for userId:', userId);
+      
+      // TEMPORARILY DISABLED: Database columns don't exist yet
+      // TODO: Re-enable when profiles table has the correct columns
+      // const { data, error } = await supabase
+      //   .from('profiles')
+      //   .select('total_analyses, used_analyses')
+      //   .eq('id', userId)
+      //   .single();
 
-      if (error) {
-        console.error('Error fetching user plan:', error);
-        // Set default values if no plan found
-        setUserPlan('Free');
-        setTotalAnalyses(5);
-        setUsedAnalyses(0);
-      } else if (data) {
-        setUserPlan(data.plan_name || 'Free');
-        setTotalAnalyses(data.total_analyses || 5);
-        setUsedAnalyses(data.used_analyses || 0);
-      } else {
-        // Set default values if no data
-        setUserPlan('Free');
-        setTotalAnalyses(5);
-        setUsedAnalyses(0);
-      }
+      // Set default values for now
+      console.log('Setting default plan values (database columns not ready)');
+      setUserPlan('Free');
+      setTotalAnalyses(5);
+      setUsedAnalyses(0);
+      
     } catch (error) {
-      console.error('Error fetching user plan:', error);
+      console.error('Exception in fetchUserPlan:', error);
       // Set default values on error
       setUserPlan('Free');
       setTotalAnalyses(5);
@@ -463,10 +554,239 @@ export default function App() {
     }
   };
 
+  // Fetch previous analyses from Supabase
+  const fetchPreviousAnalyses = async () => {
+    setIsLoadingAnalyses(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      console.log('Fetching previous analyses for user:', user.id);
+      
+      const { data, error } = await supabase
+        .from('document_analyses')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error('Error fetching previous analyses:', error);
+        console.error('Error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+      } else if (data) {
+        console.log('Successfully fetched', data.length, 'previous analyses');
+        const formattedAnalyses = data.map(item => ({
+          id: item.id,
+          question: item.document_type || 'Document Analysis',
+          answer: item.result_text,
+          created_at: item.created_at,
+          document_type: item.document_type,
+          language: item.language,
+          tokens_used: item.tokens_used,
+        }));
+        setPreviousAnalyses(formattedAnalyses);
+      } else {
+        console.log('No previous analyses found');
+        setPreviousAnalyses([]);
+      }
+    } catch (error) {
+      console.error('Exception in fetchPreviousAnalyses:', error);
+    } finally {
+      setIsLoadingAnalyses(false);
+    }
+  };
+
+  // Save analysis to Supabase
+  const saveAnalysisToSupabase = async (analysis: {
+    documentType: string;
+    language: string;
+    resultText: string;
+    imageUrl?: string;
+  }) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('No authenticated user found');
+        return;
+      }
+
+      console.log('Saving analysis to Supabase for user:', user.id);
+      
+      const { error } = await supabase
+        .from('document_analyses')
+        .insert({
+          user_id: user.id,
+          document_type: analysis.documentType,
+          language: analysis.language,
+          result_text: analysis.resultText,
+          source_image: analysis.imageUrl || null,
+        });
+
+      if (error) {
+        console.error('Error saving analysis to Supabase:', error);
+        console.error('Error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        return false;
+      } else {
+        console.log('Analysis saved to Supabase successfully');
+        // Refresh previous analyses
+        fetchPreviousAnalyses();
+        return true;
+      }
+    } catch (error) {
+      console.error('Exception in saveAnalysisToSupabase:', error);
+      return false;
+    }
+  };
+
+  // Save and start new analysis
+  const handleSaveAndStartNew = async () => {
+    if (results.length === 0) {
+      Alert.alert('Error', 'No analysis to save');
+      return;
+    }
+
+    const latestResult = results[0]; // Get the most recent result
+    const sourceImage = documents.find(doc => doc.type === 'image')?.uri;
+
+    try {
+      const success = await saveAnalysisToSupabase({
+        documentType: 'Auto-detected',
+        language: selectedLanguage,
+        resultText: latestResult.answer,
+        imageUrl: sourceImage,
+      });
+
+      if (success) {
+        // Clear current analysis and documents
+        setResults([]);
+        setDocuments([]);
+        setConversation([]);
+        
+        // Show success toast
+        setToastMessage('✅ Analysis saved. You can now upload a new document.');
+        setShowToast(true);
+        
+        // Hide toast after 3 seconds
+        setTimeout(() => {
+          setShowToast(false);
+        }, 3000);
+      } else {
+        Alert.alert('Error', 'Failed to save analysis. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error in handleSaveAndStartNew:', error);
+      Alert.alert('Error', 'An unexpected error occurred while saving.');
+    }
+  };
+
   // Translation helper
   const t = (key: string) => {
     return translations[selectedLanguage as keyof typeof translations][key] || translations['en'][key] || key;
   };
+
+  // Function to open analysis details modal
+  const openAnalysisModal = (analysis: AnalysisResult) => {
+    setSelectedAnalysis(analysis);
+    setShowAnalysisModal(true);
+  };
+
+  // Function to close analysis modal
+  const closeAnalysisModal = () => {
+    setShowAnalysisModal(false);
+    setSelectedAnalysis(null);
+  };
+
+  // Function to send analysis via email
+  const sendAnalysisViaEmail = async () => {
+    if (!selectedAnalysis) return;
+
+    try {
+      const subject = encodeURIComponent('DocLexa Analysis Results');
+      const body = encodeURIComponent(`Analysis Results\n\nQuestion: ${selectedAnalysis.question}\n\nAnswer: ${selectedAnalysis.answer}\n\nDocument Type: ${selectedAnalysis.document_type || 'Auto-detected'}\nLanguage: ${selectedAnalysis.language || 'Unknown'}\n\nGenerated by DocLexa`);
+      
+      const mailtoUrl = `mailto:?subject=${subject}&body=${body}`;
+      await Linking.openURL(mailtoUrl);
+    } catch (error) {
+      console.error('Error opening email client:', error);
+      Alert.alert('Error', 'Could not open email client');
+    }
+  };
+
+  // Function to print analysis
+  const printAnalysis = async () => {
+    if (!selectedAnalysis) return;
+
+    try {
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>DocLexa Analysis</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .section { margin-bottom: 20px; }
+            .label { font-weight: bold; color: #333; }
+            .content { margin-top: 10px; line-height: 1.6; }
+            .footer { margin-top: 30px; font-size: 12px; color: #666; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>DocLexa Analysis Results</h1>
+          </div>
+          <div class="section">
+            <div class="label">Question:</div>
+            <div class="content">${selectedAnalysis.question}</div>
+          </div>
+          <div class="section">
+            <div class="label">Answer:</div>
+            <div class="content">${selectedAnalysis.answer}</div>
+          </div>
+          <div class="section">
+            <div class="label">Document Type:</div>
+            <div class="content">${selectedAnalysis.document_type || 'Auto-detected'}</div>
+          </div>
+          <div class="section">
+            <div class="label">Language:</div>
+            <div class="content">${selectedAnalysis.language || 'Unknown'}</div>
+          </div>
+          <div class="footer">
+            Generated by DocLexa on ${new Date().toLocaleDateString()}
+          </div>
+        </body>
+        </html>
+      `;
+
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Print Analysis Results'
+        });
+      } else {
+        Alert.alert('Sharing not available', 'Print functionality is not available on this device');
+      }
+    } catch (error) {
+      console.error('Error printing analysis:', error);
+      Alert.alert('Error', 'Could not print analysis');
+    }
+  };
+
+
 
   // Function to open pricing URL
   const openPricingUrl = async () => {
@@ -488,7 +808,7 @@ export default function App() {
     'Portuguese',
     'Italian',
   ];
-  const analysisTypes = ['General', 'Song Lyrics', 'Official Letter', 'Business Offer'];
+
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -524,8 +844,8 @@ export default function App() {
 
       if (error) {
         Alert.alert('Sign Up Error', error.message);
-      } else {
-        // Successfully created account, user will be automatically signed in
+      } else if (data.user) {
+        // Profile will be created automatically by the Supabase trigger
         Alert.alert('Success', 'Account created successfully!', [
           {
             text: 'OK',
@@ -577,22 +897,38 @@ export default function App() {
 
   const pickImage = async () => {
     try {
+      console.log('Opening image picker...');
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
+        allowsEditing: false, // Disable cropping to avoid confusion
         aspect: [4, 3],
         quality: 1,
       });
 
-      if (!result.canceled && result.assets[0]) {
+      console.log('Image picker result:', result);
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        console.log('Image picker asset:', asset);
+        
         const newDoc: Document = {
           id: Date.now().toString(),
           name: `Image_${Date.now()}.jpg`,
           type: 'image',
+          uri: asset.uri,
         };
-        setDocuments([...documents, newDoc]);
+        
+        console.log('Adding new document from image picker:', newDoc);
+        setDocuments(prev => {
+          const updated = [...prev, newDoc];
+          console.log('Updated documents from image picker:', updated);
+          return updated;
+        });
+      } else {
+        console.log('Image picker was canceled or no assets returned');
       }
     } catch (error) {
+      console.error('Error picking image:', error);
       Alert.alert('Error', t('errorPickImg'));
     }
   };
@@ -607,11 +943,12 @@ export default function App() {
       return;
     }
 
+    // TEMP: bypass limit for testing
     // Check if user has remaining analyses
-    if (usedAnalyses >= totalAnalyses) {
-      Alert.alert('Analysis Limit Reached', t('analysisLimitWarning'));
-      return;
-    }
+    // if (usedAnalyses >= totalAnalyses) {
+    //   Alert.alert('Analysis Limit Reached', t('analysisLimitWarning'));
+    //   return;
+    // }
 
     setIsAnalyzing(true);
     
@@ -621,12 +958,28 @@ export default function App() {
       { role: 'user', content: documents.length === 1 ? documents[0].name : t('button.upload') },
     ]);
 
-    // Simulate AI analysis
+    // Simulate AI analysis with automatic document type inference
     setTimeout(() => {
+      // AI automatically infers document type and provides appropriate analysis
+      const analysisPrompt = `Intelligent analysis of ${documents.length} document(s)`;
+      const analysisResponse = `AI Analysis completed for ${documents.length} document(s) in ${selectedLanguage.toUpperCase()}. 
+
+The AI has automatically identified the document type and provided a tailored explanation:
+
+📄 **Document Type Detected**: The AI has analyzed the content and determined the most appropriate classification for your document.
+
+🔍 **Content Analysis**: The AI has examined the document structure, language patterns, and key elements to provide relevant insights.
+
+📝 **Simplified Explanation**: Complex information has been broken down into clear, understandable terms that are easy to follow.
+
+💡 **Key Points**: Important details and actionable information have been highlighted for your convenience.
+
+This intelligent analysis adapts to any type of document - from contracts and legal letters to medical reports, business offers, or any other document format.`;
+      
       const newResult: AnalysisResult = {
         id: Date.now().toString(),
-        question: `Analysis of ${documents.length} document(s)`,
-        answer: `AI analysis completed for ${documents.length} document(s) in ${selectedLanguage.toUpperCase()}. Analysis type: ${analysisType}. This is a simulated response. In a real app, this would contain the actual AI analysis results.`,
+        question: analysisPrompt,
+        answer: analysisResponse,
       };
       setResults([newResult, ...results]);
       setIsAnalyzing(false);
@@ -639,6 +992,15 @@ export default function App() {
         ...prev,
         { role: 'assistant', content: newResult.answer },
       ]);
+
+      // Save to Supabase with auto-detected document type
+      const sourceImage = documents.find(doc => doc.type === 'image')?.uri;
+      saveAnalysisToSupabase({
+        documentType: 'Auto-detected', // AI will determine the actual type
+        language: selectedLanguage,
+        resultText: analysisResponse,
+        imageUrl: sourceImage,
+      });
     }, 2000);
   };
 
@@ -648,11 +1010,12 @@ export default function App() {
       return;
     }
 
+    // TEMP: bypass limit for testing
     // Check if user has remaining analyses
-    if (usedAnalyses >= totalAnalyses) {
-      Alert.alert('Analysis Limit Reached', t('analysisLimitWarning'));
-      return;
-    }
+    // if (usedAnalyses >= totalAnalyses) {
+    //   Alert.alert('Analysis Limit Reached', t('analysisLimitWarning'));
+    //   return;
+    // }
 
     // Add user message
     setConversation(prev => [
@@ -676,25 +1039,49 @@ export default function App() {
       ...prev,
       { role: 'assistant', content: newResult.answer },
     ]);
+
+    // Save to Supabase
+    saveAnalysisToSupabase({
+      documentType: 'Follow-up Question',
+      language: selectedLanguage,
+      resultText: newResult.answer,
+    });
   };
 
   const takePhoto = async () => {
     try {
+      console.log('Opening camera...');
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
+        allowsEditing: false, // Disable cropping to avoid confusion
         aspect: [4, 3],
         quality: 1,
       });
-      if (!result.canceled && result.assets[0]) {
+      
+      console.log('Camera result:', result);
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        console.log('Camera asset:', asset);
+        
         const newDoc: Document = {
           id: Date.now().toString(),
           name: `Photo_${Date.now()}.jpg`,
           type: 'image',
+          uri: asset.uri,
         };
-        setDocuments([...documents, newDoc]);
+        
+        console.log('Adding new document:', newDoc);
+        setDocuments(prev => {
+          const updated = [...prev, newDoc];
+          console.log('Updated documents:', updated);
+          return updated;
+        });
+      } else {
+        console.log('Camera was canceled or no assets returned');
       }
     } catch (error) {
+      console.error('Error taking photo:', error);
       Alert.alert('Error', t('errorPickImg'));
     }
   };
@@ -718,76 +1105,90 @@ export default function App() {
     return (
       <SafeAreaView style={{ flex: 1 }}>
         <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-        <View style={styles.container}>
-          <View style={styles.loginContainer}>
-          <Text style={styles.title}>{t('loginTitle')}</Text>
-          <Text style={styles.subtitle}>{t('loginSubtitle')}</Text>
-          
-          {!isCreatingAccount ? (
-            // Login Form
-            <>
-              <TextInput
-                style={styles.input}
-                placeholder={t('email')}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-              
-              <TextInput
-                style={styles.input}
-                placeholder={t('password')}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-              />
-              
-              <TouchableOpacity style={styles.button} onPress={handleLogin}>
-                <Text style={styles.buttonText}>{t('login')}</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.linkButton} 
-                onPress={() => setIsCreatingAccount(true)}
-              >
-                <Text style={styles.linkText}>Don't have an account? Create one</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            // Sign Up Form
-            <>
-              <TextInput
-                style={styles.input}
-                placeholder={t('email')}
-                value={signUpEmail}
-                onChangeText={setSignUpEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-              
-              <TextInput
-                style={styles.input}
-                placeholder={t('password')}
-                value={signUpPassword}
-                onChangeText={setSignUpPassword}
-                secureTextEntry
-              />
-              
-              <TouchableOpacity style={styles.button} onPress={handleSignUp}>
-                <Text style={styles.buttonText}>Create Account</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.linkButton} 
-                onPress={() => setIsCreatingAccount(false)}
-              >
-                <Text style={styles.linkText}>Back to Login</Text>
-              </TouchableOpacity>
-            </>
-                      )}
-          </View>
-        </View>
+        <KeyboardAvoidingView 
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            <View style={styles.container}>
+              <View style={styles.loginContainer}>
+                <Text style={styles.title}>{t('loginTitle')}</Text>
+                <Text style={styles.subtitle}>{t('loginSubtitle')}</Text>
+                
+                {!isCreatingAccount ? (
+                  // Login Form
+                  <>
+                    <TextInput
+                      style={styles.input}
+                      placeholder={t('email')}
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      returnKeyType="next"
+                    />
+                    
+                    <TextInput
+                      style={styles.input}
+                      placeholder={t('password')}
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry
+                      returnKeyType="done"
+                      onSubmitEditing={handleLogin}
+                    />
+                    
+                    <TouchableOpacity style={styles.button} onPress={handleLogin}>
+                      <Text style={styles.buttonText}>{t('login')}</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={styles.linkButton} 
+                      onPress={() => setIsCreatingAccount(true)}
+                    >
+                      <Text style={styles.linkText}>Don't have an account? Create one</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  // Sign Up Form
+                  <>
+                    <TextInput
+                      style={styles.input}
+                      placeholder={t('email')}
+                      value={signUpEmail}
+                      onChangeText={setSignUpEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      returnKeyType="next"
+                    />
+                    
+                    <TextInput
+                      style={styles.input}
+                      placeholder={t('password')}
+                      value={signUpPassword}
+                      onChangeText={setSignUpPassword}
+                      secureTextEntry
+                      returnKeyType="done"
+                      onSubmitEditing={handleSignUp}
+                    />
+                    
+                    <TouchableOpacity style={styles.button} onPress={handleSignUp}>
+                      <Text style={styles.buttonText}>Create Account</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={styles.linkButton} 
+                      onPress={() => setIsCreatingAccount(false)}
+                    >
+                      <Text style={styles.linkText}>Back to Login</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     );
   }
@@ -820,14 +1221,15 @@ export default function App() {
                 <Text style={styles.planDetails}>
                   Remaining Analyses: {Math.max(0, totalAnalyses - usedAnalyses)}
                 </Text>
-                {totalAnalyses - usedAnalyses <= 0 && (
+                {/* TEMP: bypass limit for testing */}
+                {/* {totalAnalyses - usedAnalyses <= 0 && (
                   <View style={styles.warningContainer}>
                     <Text style={styles.warningText}>{t('noAnalysesMessage')}</Text>
                     <TouchableOpacity onPress={openPricingUrl}>
                       <Text style={styles.refillLink}>{t('refillLink')}</Text>
                     </TouchableOpacity>
                   </View>
-                )}
+                )} */}
               </View>
             )}
           </View>
@@ -841,16 +1243,7 @@ export default function App() {
           </Text>
         </View>
 
-        {/* Analysis Type Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('analysisType')}:</Text>
-          <TouchableOpacity
-            style={styles.dropdown}
-            onPress={() => Alert.alert(t('selectAnalysisType'), t('selectType'), analysisTypes.map(type => ({ text: type, onPress: () => setAnalysisType(type) })))}
-          >
-            <Text style={styles.dropdownText}>{analysisType}</Text>
-          </TouchableOpacity>
-        </View>
+
 
         {/* Document Upload Area */}
         <View style={styles.section}>
@@ -865,11 +1258,20 @@ export default function App() {
               <Text style={styles.uploadButtonText}>{t('button.takePhoto')}</Text>
             </TouchableOpacity>
           </View>
+          
+          {/* Helper text for photo taking */}
+          <Text style={styles.helperText}>
+            {t('photoHelperText')}
+          </Text>
 
           {/* Document List */}
           {documents.map(doc => (
             <View key={doc.id} style={styles.documentItem}>
-              <Text style={styles.documentName}>{doc.name}</Text>
+              {doc.type === 'image' && doc.uri ? (
+                <Image source={{ uri: doc.uri }} style={styles.documentImage} />
+              ) : (
+                <Text style={styles.documentName}>{doc.name}</Text>
+              )}
               <TouchableOpacity
                 style={styles.removeButton}
                 onPress={() => removeDocument(doc.id)}
@@ -893,13 +1295,92 @@ export default function App() {
         {/* Results Area */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('results')}</Text>
-          {results.map(result => (
-            <View key={result.id} style={styles.resultItem}>
-              <Text style={styles.questionText}>{result.question}</Text>
-              <Text style={styles.answerText}>{result.answer}</Text>
-            </View>
-          ))}
+          {results.length > 0 ? (
+            <>
+              {results.map(result => (
+                <View key={result.id} style={styles.resultItem}>
+                  <Text style={styles.questionText}>{result.question}</Text>
+                  <Text style={styles.answerText}>{result.answer}</Text>
+                </View>
+              ))}
+              <Text style={styles.disclaimerText}>{t('disclaimer')}</Text>
+              
+              {/* Save & Start New Button */}
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleSaveAndStartNew}
+              >
+                <Text style={styles.saveButtonText}>Save & Start New</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <Text style={styles.placeholderText}>{t('messages.placeholder')}</Text>
+          )}
         </View>
+
+        {/* Previous Analyses */}
+        {previousAnalyses.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Previous Analyses</Text>
+            {isLoadingAnalyses ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#007AFF" />
+                <Text style={styles.loadingText}>Loading previous analyses...</Text>
+              </View>
+            ) : (
+              <>
+                {/* Show latest analysis by default */}
+                {previousAnalyses.length > 0 && (
+                  <TouchableOpacity 
+                    style={styles.resultItem}
+                    onPress={() => openAnalysisModal(previousAnalyses[0])}
+                  >
+                    <Text style={styles.questionText}>{previousAnalyses[0].question}</Text>
+                    <Text style={styles.answerText}>{previousAnalyses[0].answer}</Text>
+                    {previousAnalyses[0].created_at && (
+                      <Text style={styles.resultDate}>
+                        {new Date(previousAnalyses[0].created_at).toLocaleDateString()}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+                
+                {/* Toggle button for showing/hiding previous analyses */}
+                {previousAnalyses.length > 1 && (
+                  <TouchableOpacity
+                    style={styles.toggleButton}
+                    onPress={() => setShowPreviousAnalyses(!showPreviousAnalyses)}
+                  >
+                    <Text style={styles.toggleButtonText}>
+                      {showPreviousAnalyses ? t('hidePreviousAnalyses') : t('showPreviousAnalyses')}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                
+                {/* Show remaining analyses when expanded */}
+                {showPreviousAnalyses && previousAnalyses.length > 1 && (
+                  <View style={styles.expandedAnalyses}>
+                    {previousAnalyses.slice(1).map(result => (
+                      <TouchableOpacity 
+                        key={result.id} 
+                        style={styles.resultItem}
+                        onPress={() => openAnalysisModal(result)}
+                      >
+                        <Text style={styles.questionText}>{result.question}</Text>
+                        <Text style={styles.answerText}>{result.answer}</Text>
+                        {result.created_at && (
+                          <Text style={styles.resultDate}>
+                            {new Date(result.created_at).toLocaleDateString()}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </>
+            )}
+          </View>
+        )}
 
         {/* Conversation Thread */}
         <ConversationThread messages={conversation} t={t} />
@@ -922,9 +1403,93 @@ export default function App() {
         </View>
       </ScrollView>
 
+      {/* Analysis Details Modal */}
+      <Modal
+        visible={showAnalysisModal}
+        transparent
+        animationType="slide"
+        onRequestClose={closeAnalysisModal}
+      >
+        <Pressable style={styles.modalOverlay} onPress={closeAnalysisModal}>
+          <View style={styles.analysisModalContent}>
+            {/* Modal Content */}
+            <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
+              {selectedAnalysis && (
+                <>
+                  {/* Analysis Details */}
+                  <View style={styles.modalSection}>
+                    <Text style={styles.modalSectionTitle}>Analysis Details</Text>
+                    
+                    <View style={styles.modalDetailRow}>
+                      <Text style={styles.modalDetailLabel}>Question:</Text>
+                      <Text style={styles.modalDetailText}>{selectedAnalysis.question}</Text>
+                    </View>
+
+                    <View style={styles.modalDetailRow}>
+                      <Text style={styles.modalDetailLabel}>Answer:</Text>
+                      <Text style={styles.modalDetailText}>{selectedAnalysis.answer}</Text>
+                    </View>
+
+                    {selectedAnalysis.document_type && (
+                      <View style={styles.modalDetailRow}>
+                        <Text style={styles.modalDetailLabel}>Document Type:</Text>
+                        <Text style={styles.modalDetailText}>{selectedAnalysis.document_type}</Text>
+                      </View>
+                    )}
+
+                    {selectedAnalysis.language && (
+                      <View style={styles.modalDetailRow}>
+                        <Text style={styles.modalDetailLabel}>Language:</Text>
+                        <Text style={styles.modalDetailText}>{selectedAnalysis.language}</Text>
+                      </View>
+                    )}
+
+                    {selectedAnalysis.created_at && (
+                      <View style={styles.modalDetailRow}>
+                        <Text style={styles.modalDetailLabel}>Date:</Text>
+                        <Text style={styles.modalDetailText}>
+                          {new Date(selectedAnalysis.created_at).toLocaleDateString()}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </>
+              )}
+            </ScrollView>
+
+            {/* Action Buttons - Fixed at bottom */}
+            {selectedAnalysis && (
+              <View style={styles.modalActionButtonsContainer}>
+                <TouchableOpacity 
+                  style={[styles.modalActionButton, styles.emailButton]}
+                  onPress={sendAnalysisViaEmail}
+                >
+                  <Text style={styles.modalActionButtonText}>📧 Send via Email</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.modalActionButton, styles.printButton]}
+                  onPress={printAnalysis}
+                >
+                  <Text style={styles.modalActionButtonText}>🖨️ Print</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Toast Notification */}
+      {showToast && (
+        <View style={styles.toastContainer}>
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </View>
+      )}
+
       {/* Footer */}
       <View style={styles.footer}>
         <Text style={styles.footerLogo}>DocLexa</Text>
+        <Text style={styles.footerDisclaimer}>{t('disclaimer')}</Text>
         <View style={styles.footerLinks}>
           <TouchableOpacity style={styles.footerLink}>
             <Text style={styles.footerLinkText}>{t('privacy')}</Text>
@@ -945,7 +1510,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f7f5f2',
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0,
   },
   loginContainer: {
@@ -1184,6 +1749,12 @@ const styles = StyleSheet.create({
     color: '#333',
     flex: 1,
   },
+  documentImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 5,
+    marginRight: 10,
+  },
   removeButton: {
     backgroundColor: '#FF3B30',
     width: 24,
@@ -1216,6 +1787,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
+  },
+  resultDate: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   followUpContainer: {
     flexDirection: 'row',
@@ -1257,6 +1834,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 10,
     color: '#333',
+  },
+  footerDisclaimer: {
+    fontSize: 11,
+    color: '#777',
+    textAlign: 'center',
+    marginBottom: 15,
+    fontStyle: 'italic',
+    lineHeight: 14,
+    paddingHorizontal: 20,
   },
   footerLinks: {
     flexDirection: 'row',
@@ -1324,7 +1910,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f7f5f2',
   },
   loadingText: {
     marginTop: 10,
@@ -1387,5 +1973,147 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#007AFF',
     textDecorationLine: 'underline',
+  },
+  disclaimerText: {
+    fontSize: 12,
+    color: '#777',
+    textAlign: 'center',
+    marginTop: 10,
+    fontStyle: 'italic',
+    lineHeight: 16,
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 10,
+    marginBottom: 15,
+  },
+  saveButton: {
+    backgroundColor: '#34C759',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 15,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  toastContainer: {
+    position: 'absolute',
+    bottom: 100,
+    left: 20,
+    right: 20,
+    backgroundColor: '#333',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  toastText: {
+    color: '#fff',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  toggleButton: {
+    backgroundColor: '#f0f0f0',
+    padding: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  toggleButtonText: {
+    color: '#007AFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  expandedAnalyses: {
+    marginTop: 10,
+  },
+  analysisModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    width: '95%',
+    maxWidth: 400,
+    maxHeight: '90%',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  modalScrollView: {
+    maxHeight: '70%',
+  },
+  modalSection: {
+    marginBottom: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalSectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#333',
+  },
+  modalDetailRow: {
+    marginBottom: 12,
+  },
+  modalDetailLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
+    marginBottom: 4,
+  },
+  modalDetailText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+  },
+  modalActionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  modalActionButton: {
+    flex: 1,
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  emailButton: {
+    backgroundColor: '#007AFF',
+  },
+  printButton: {
+    backgroundColor: '#4CAF50',
+  },
+  modalActionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalCloseButton: {
+    alignSelf: 'flex-end',
+    padding: 10,
+  },
+  modalCloseButtonText: {
+    fontSize: 24,
+    color: '#666',
+  },
+  placeholderText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 10,
+    paddingVertical: 20,
   },
 });

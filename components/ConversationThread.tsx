@@ -27,7 +27,7 @@ const ConversationThread: React.FC<ConversationThreadProps> = ({ messages, t }) 
         keyboardShouldPersistTaps="handled"
       >
         {messages.length === 0 ? (
-          <Text style={styles.conversationPlaceholder}>{t('messages.placeholder')}</Text>
+          <Text style={styles.conversationPlaceholder}>{t('messages.noMessages')}</Text>
         ) : (
           messages.map((msg, idx) => (
             <View
